@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PharmaBot - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/lucide-css" rel="stylesheet">
+</head>
+<body class="min-h-screen bg-[url('https://cdn.pixabay.com/photo/2016/11/09/15/27/dna-1811955_1280.jpg')] bg-cover bg-center bg-fixed before:content-[''] before:absolute before:top-0 before:left-0 before:w-full before:h-full before:bg-white/10 before:z-0">
+    <div class="relative z-10">
+        <nav class="bg-white/90 backdrop-blur-sm shadow-md">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <h1 class="text-xl font-bold text-blue-600">PharmaBot Dashboard</h1>
+                    </div>
+                    <div class="flex items-center">
+                        <span id="userName" class="mr-4 text-gray-700"></span>
+                        <button onclick="logout()" class="text-gray-600 hover:text-gray-900">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-6">
+                <h2 class="text-2xl font-semibold mb-4">Welcome to PharmaBot</h2>
+                <p class="text-gray-600">
+                    Use the chat button in the bottom right corner to get medical assistance and recommendations.
+                </p>
+            </div>
+        </main>
+
+        <!-- Chat Bot Button -->
+        <div id="chatButton" class="fixed bottom-6 right-6 z-50">
+            <button onclick="toggleChat()"
+                class="bg-blue-500 text-white rounded-full p-4 shadow-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Chat Window -->
+        <div id="chatWindow" class="fixed bottom-24 right-6 w-96 bg-white/95 backdrop-blur-sm rounded-lg shadow-xl hidden z-50">
+            <div class="p-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold">PharmaBot Assistant</h3>
+            </div>
+            <div id="chatMessages" class="h-96 overflow-y-auto p-4 space-y-4">
+                <!-- Messages will be added here -->
+            </div>
+            <div class="p-4 border-t border-gray-200">
+                <form id="chatForm" class="flex space-x-2">
+                    <input type="text" id="messageInput"
+                        class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200"
+                        placeholder="Type your message...">
+                    <button type="submit"
+                        class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        Send
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chatOpen = false;
+        const chatWindow = document.getElementById('chatWindow');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatForm = document.getElementById('chatForm');
+        const messageInput = document.getElementById('messageInput');
+        let assessmentStage = 'initial';
+        let symptoms = {};
+
+        function addTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'flex items-start';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = `
+                <div class="bg-blue-100 rounded-lg p-3 max-w-[80%]">
+                    <div class="flex space-x-2">
+                        <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+                        <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                        <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+                    </div>
+                </div>
+            `;
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        function addBotMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'flex items-start';
+            messageDiv.innerHTML = `
+                <div class="bg-blue-100 rounded-lg p-3 max-w-[80%]">
+                    <p class="text-gray-800">${message}</p>
+                </div>
+            `;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function addUserMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'flex items-start justify-end';
+            messageDiv.innerHTML = `
+                <div class="bg-gray-100 rounded-lg p-3 max-w-[80%]">
+                    <p class="text-gray-800">${message}</p>
+                </div>
+            `;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function getEmergencyResponse() {
+            return `🚨 EMERGENCY ALERT: Based on your symptoms, you need immediate medical attention. Please:
+            1. Call emergency services (911) immediately
+            2. Don't wait or try self-medication
+            3. If possible, have someone drive you to the nearest emergency room
+            
+            Your symptoms suggest a condition that requires urgent medical evaluation.`;
+        }
+
+        function getMedicalResponse(condition) {
+            const responses = {
+                // Original conditions
+                'mild_headache': {
+                    recommendation: "For your mild headache, you may try:\n" +
+                        "1. Acetaminophen (Tylenol) 500mg\n" +
+                        "2. Ibuprofen (Advil) 200-400mg\n" +
+                        "Additional measures:\n" +
+                        "- Rest in a quiet, dark room\n" +
+                        "- Stay hydrated\n" +
+                        "- Apply cold or warm compress\n\n" +
+                        "⚠️ If headache persists for >3 days, consult a doctor.",
+                    urgent: false
+                },
+                'severe_headache': {
+                    recommendation: "Your severe headache needs medical attention, especially if:\n" +
+                        "- It's the worst headache of your life\n" +
+                        "- Accompanied by confusion or stiff neck\n" +
+                        "- Sudden onset\n\n" +
+                        "🏥 Please visit the nearest emergency room or urgent care.",
+                    urgent: true
+                },
+                'mild_fever': {
+                    recommendation: "For mild fever (< 101°F/38.3°C):\n" +
+                        "1. Acetaminophen (Tylenol) 500mg every 6 hours\n" +
+                        "2. Ibuprofen 400mg every 6 hours\n" +
+                        "Also:\n" +
+                        "- Rest and stay hydrated\n" +
+                        "- Use light clothing\n" +
+                        "- Monitor temperature\n\n" +
+                        "⚠️ If fever persists >3 days, seek medical attention.",
+                    urgent: false
+                },
+                // New conditions added
+                'cancer_symptoms': {
+                    recommendation: "🚨 Your symptoms require immediate medical evaluation. Common cancer warning signs include:\n" +
+                        "- Unexplained weight loss\n" +
+                        "- Unusual bleeding or bruising\n" +
+                        "- Persistent fatigue\n" +
+                        "- Unexplained pain\n\n" +
+                        "Please schedule an urgent appointment with your doctor for proper evaluation and testing.",
+                    urgent: true
+                },
+                'diabetes_symptoms': {
+                    recommendation: "Your symptoms may indicate diabetes. Common signs include:\n" +
+                        "- Excessive thirst\n" +
+                        "- Frequent urination\n" +
+                        "- Unexplained weight loss\n" +
+                        "- Fatigue\n\n" +
+                        "🏥 Please schedule an appointment with your doctor for blood sugar testing.",
+                    urgent: false
+                },
+                'heart_disease': {
+                    recommendation: "🚨 Your symptoms may indicate heart problems. Seek immediate medical attention if experiencing:\n" +
+                        "- Chest pain or pressure\n" +
+                        "- Shortness of breath\n" +
+                        "- Pain in arms/jaw\n" +
+                        "- Irregular heartbeat\n\n" +
+                        "Call emergency services (911) immediately.",
+                    urgent: true
+                },
+                'arthritis': {
+                    recommendation: "For arthritis symptoms:\n" +
+                        "1. Take prescribed anti-inflammatory medication\n" +
+                        "2. Apply heat/cold therapy\n" +
+                        "3. Gentle exercise\n" +
+                        "4. Rest affected joints\n\n" +
+                        "Schedule an appointment with a rheumatologist for proper evaluation.",
+                    urgent: false
+                },
+                'asthma': {
+                    recommendation: "For asthma symptoms:\n" +
+                        "1. Use prescribed inhaler as directed\n" +
+                        "2. Avoid triggers\n" +
+                        "3. Stay calm and seated upright\n\n" +
+                        "🚨 Seek emergency care if:\n" +
+                        "- Inhaler isn't helping\n" +
+                        "- Difficulty speaking\n" +
+                        "- Blue lips or fingernails",
+                    urgent: false
+                },
+                'depression': {
+                    recommendation: "For depression symptoms:\n" +
+                        "1. Schedule appointment with mental health professional\n" +
+                        "2. Maintain daily routine\n" +
+                        "3. Exercise regularly\n" +
+                        "4. Stay connected with support system\n\n" +
+                        "🚨 If having thoughts of self-harm, call 988 (Suicide Prevention Lifeline) immediately.",
+                    urgent: false
+                },
+                'anxiety': {
+                    recommendation: "For anxiety symptoms:\n" +
+                        "1. Practice deep breathing exercises\n" +
+                        "2. Try grounding techniques\n" +
+                        "3. Maintain regular sleep schedule\n" +
+                        "4. Consider counseling\n\n" +
+                        "⚠️ If panic attacks are severe or frequent, consult a mental health professional.",
+                    urgent: false
+                },
+                'hypertension': {
+                    recommendation: "For high blood pressure:\n" +
+                        "1. Monitor blood pressure regularly\n" +
+                        "2. Reduce sodium intake\n" +
+                        "3. Exercise moderately\n" +
+                        "4. Take prescribed medications\n\n" +
+                        "🚨 Seek emergency care if BP >180/120 or symptoms of hypertensive crisis.",
+                    urgent: false
+                },
+                'covid19': {
+                    recommendation: "For COVID-19 symptoms:\n" +
+                        "1. Isolate immediately\n" +
+                        "2. Get tested\n" +
+                        "3. Monitor temperature and oxygen levels\n" +
+                        "4. Rest and stay hydrated\n\n" +
+                        "🚨 Seek emergency care if:\n" +
+                        "- Difficulty breathing\n" +
+                        "- Persistent chest pain\n" +
+                        "- Confusion\n" +
+                        "- Bluish lips or face",
+                    urgent: false
+                },
+                'allergic_reaction': {
+                    recommendation: "For mild allergic reactions:\n" +
+                        "1. Take antihistamine (Benadryl)\n" +
+                        "2. Avoid trigger if known\n" +
+                        "3. Apply cool compress\n\n" +
+                        "🚨 For severe reactions (difficulty breathing, swelling):\n" +
+                        "- Use EpiPen if prescribed\n" +
+                        "- Call 911 immediately",
+                    urgent: false
+                },
+                'kidney_disease': {
+                    recommendation: "Your symptoms may indicate kidney problems:\n" +
+                        "- Monitor fluid intake\n" +
+                        "- Follow low-sodium diet\n" +
+                        "- Take prescribed medications\n\n" +
+                        "🏥 Schedule appointment with nephrologist for evaluation.",
+                    urgent: false
+                },
+                'abdominal_pain_mild': {
+                    recommendation: "For mild abdominal pain:\n" +
+                        "1. Avoid solid foods temporarily\n" +
+                        "2. Clear liquids only\n" +
+                        "3. Consider Pepto-Bismol for upset stomach\n\n" +
+                        "⚠️ If pain persists >4 hours or worsens, seek medical attention.",
+                    urgent: false
+                },
+                'abdominal_pain_severe': {
+                    recommendation: "Severe abdominal pain requires immediate medical evaluation, especially with:\n" +
+                        "- Fever\n" +
+                        "- Vomiting\n" +
+                        "- Severe tenderness\n\n" +
+                        "🏥 Please visit emergency room immediately.",
+                    urgent: true
+                },
+                'dry_cough': {
+                    recommendation: "For dry cough relief:\n" +
+                        "1. Dextromethorphan (Robitussin, Delsym)\n" +
+                        "2. Throat lozenges\n" +
+                        "Also:\n" +
+                        "- Stay hydrated\n" +
+                        "- Use a humidifier\n" +
+                        "- Honey in warm water\n\n" +
+                        "⚠️ If cough persists >1 week or worsens, consult doctor.",
+                    urgent: false
+                },
+                'productive_cough': {
+                    recommendation: "For productive cough:\n" +
+                        "1. Guaifenesin (Mucinex)\n" +
+                        "2. Stay hydrated\n" +
+                        "3. Steam inhalation\n\n" +
+                        "⚠️ Seek immediate care if:\n" +
+                        "- Coughing blood\n" +
+                        "- Difficulty breathing\n" +
+                        "- High fever",
+                    urgent: false
+                },
+                'liver_disease': {
+                    recommendation: "For liver-related symptoms:\n" +
+                        "1. Avoid alcohol completely\n" +
+                        "2. Follow low-fat diet\n" +
+                        "3. Take prescribed medications\n\n" +
+                        "🚨 Seek immediate care if:\n" +
+                        "- Severe abdominal pain\n" +
+                        "- Yellow skin/eyes\n" +
+                        "- Mental confusion",
+                    urgent: false
+                }
+            };
+
+            return responses[condition] || {
+                recommendation: "Based on your symptoms, I recommend consulting a healthcare provider for proper evaluation. " +
+                    "While I can provide general guidance, a proper medical examination would be best for your condition.",
+                urgent: false
+            };
+        }
+
+        function assessSymptoms(message) {
+            const msg = message.toLowerCase();
+            
+            // Emergency symptoms check
+            const emergencySymptoms = [
+                'chest pain',
+                'cannot breathe',
+                'stroke',
+                'heart attack',
+                'unconscious',
+                'severe bleeding',
+                'head injury',
+                'suicidal',
+                'anaphylaxis',
+                'seizure'
+            ];
+
+            if (emergencySymptoms.some(symptom => msg.includes(symptom))) {
+                return getEmergencyResponse();
+            }
+
+            // Cancer symptoms
+            if (msg.includes('cancer') || 
+                (msg.includes('lump') && msg.includes('breast')) ||
+                (msg.includes('blood') && msg.includes('stool')) ||
+                (msg.includes('unexplained') && (msg.includes('weight loss') || msg.includes('pain')))) {
+                return getMedicalResponse("cancer_symptoms").recommendation;
+                }
+                // Heart disease symptoms
+            if (msg.includes('heart') || 
+                (msg.includes('chest') && (msg.includes('pain') || msg.includes('pressure'))) ||
+                msg.includes('shortness of breath')) {
+                return getMedicalResponse('heart_disease').recommendation;
+            }
+            
+            if (msg.includes('cough')) {
+                if (msg.includes('phlegm') || msg.includes('mucus') || msg.includes('productive')) {
+                    return getMedicalResponse('productive_cough').recommendation;
+                }
+                return getMedicalResponse('dry_cough').recommendation;
+            }
+
+            // Abdominal pain
+            if (msg.includes('stomach') || msg.includes('abdomen') || msg.includes('belly')) {
+                if (msg.includes('severe') || msg.includes('intense') || msg.includes('worst')) {
+                    return getMedicalResponse('abdominal_pain_severe').recommendation;
+                }
+                return getMedicalResponse('abdominal_pain_mild').recommendation;
+            }
+
+            // Diabetes symptoms
+            if (msg.includes('diabetes') || 
+                (msg.includes('thirst') && msg.includes('frequent urination')) ||
+                (msg.includes('always hungry') && msg.includes('weight loss'))) {
+                return getMedicalResponse('diabetes_symptoms').recommendation;
+            }
+
+            // Arthritis symptoms
+            if (msg.includes('arthritis') || 
+                (msg.includes('joint') && (msg.includes('pain') || msg.includes('stiffness'))) ||
+                msg.includes('swollen joints')) {
+                return getMedicalResponse('arthritis').recommendation;
+            }
+
+            // Asthma symptoms
+            if (msg.includes('asthma') || 
+                msg.includes('wheezing') ||
+                (msg.includes('trouble') && msg.includes('breathing'))) {
+                return getMedicalResponse('asthma').recommendation;
+            }
+
+            // Depression symptoms
+            if (msg.includes('depression') || 
+                msg.includes('feeling hopeless') ||
+                msg.includes('lost interest') ||
+                msg.includes('always sad')) {
+                return getMedicalResponse('depression').recommendation;
+            }
+
+            // Anxiety symptoms
+            if (msg.includes('anxiety') || 
+                msg.includes('panic attack') ||
+                (msg.includes('worried') && msg.includes('constantly'))) {
+                return getMedicalResponse('anxiety').recommendation;
+            }
+
+            // Hypertension symptoms
+            if (msg.includes('high blood pressure') || 
+                msg.includes('hypertension') ||
+                (msg.includes('blood pressure') && msg.includes('headache'))) {
+                return getMedicalResponse('hypertension').recommendation;
+            }
+
+            // COVID-19 symptoms
+            if (msg.includes('covid') || 
+                ((msg.includes('fever') || msg.includes('cough')) && 
+                 (msg.includes('taste') || msg.includes('smell')))) {
+                return getMedicalResponse('covid19').recommendation;
+            }
+
+            // Allergic reaction
+            if (msg.includes('allergic') || 
+                msg.includes('allergy') ||
+                msg.includes('hives') ||
+                msg.includes('rash')) {
+                return getMedicalResponse('allergic_reaction').recommendation;
+            }
+
+            // Kidney disease symptoms
+            if (msg.includes('kidney') || 
+                (msg.includes('back pain') && msg.includes('urination')) ||
+                msg.includes('swollen ankles')) {
+                return getMedicalResponse('kidney_disease').recommendation;
+            }
+
+            // Liver disease symptoms
+            if (msg.includes('liver') || 
+                msg.includes('jaundice') ||
+                (msg.includes('yellow') && (msg.includes('skin') || msg.includes('eyes')))) {
+                return getMedicalResponse('liver_disease').recommendation;
+            }
+
+            // Original symptom checks
+            // Headache assessment
+            if (msg.includes('headache')) {
+                if (msg.includes('severe') || msg.includes('worst') || msg.includes('terrible')) {
+                    return getMedicalResponse('severe_headache').recommendation;
+                }
+                return getMedicalResponse('mild_headache').recommendation;
+            }
+
+            // Fever assessment
+            if (msg.includes('fever')) {
+                if (msg.includes('high') || msg.includes('103') || msg.includes('104')) {
+                    return getMedicalResponse('high_fever').recommendation;
+                }
+                return getMedicalResponse('mild_fever').recommendation;
+            }
+
+            // Default response for unclear symptoms
+            return "Could you please provide more details about your symptoms? Include:\n" +
+                   "1. How long you've had them\n" +
+                   "2. How severe they are\n" +
+                   "3. Any other symptoms\n" +
+                   "This will help me provide better recommendations.";
+        }
+
+        // Update the chat form event listener
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (message) {
+                addUserMessage(message);
+                messageInput.value = '';
+                
+                addTypingIndicator();
+                setTimeout(() => {
+                    removeTypingIndicator();
+                    const response = assessSymptoms(message);
+                    addBotMessage(response);
+                }, 1500);
+            }
+        });
+
+        function toggleChat() {
+            chatOpen = !chatOpen;
+            chatWindow.classList.toggle('hidden');
+            if (chatOpen && chatMessages.children.length === 0) {
+                addTypingIndicator();
+                setTimeout(() => {
+                    removeTypingIndicator();
+                    addBotMessage("Hello! I'm your PharmaBot assistant. How can I help you today?");
+                    addTypingIndicator();
+                    setTimeout(() => {
+                        removeTypingIndicator();
+                        addBotMessage("Please describe your symptoms in detail so I can provide appropriate recommendations.");
+                    }, 1500);
+                }, 1500);
+            }
+        }
+
+        // Logout function
+        function logout() {
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>
